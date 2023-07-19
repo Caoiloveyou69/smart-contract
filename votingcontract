@@ -1,0 +1,108 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+// Rest of the contract code...
+
+pragma solidity ^0.8.0;
+
+contract VotingContract {
+    address public admin;
+    bool public votingOpen;
+    uint256 public currentTopicId;
+    mapping(uint256 => Topic) public topics;
+    mapping(address => bool) public hasVoted;
+    mapping(address => uint256) public rewards;
+
+    struct Topic {
+        string name;
+        string description;
+        uint256 voteCount;
+        mapping(uint256 => address) votes;
+    }
+
+    event NewTopic(uint256 indexed topicId, string name, string description);
+    event VoteCasted(uint256 indexed topicId, address voter);
+    event RewardsClaimed(address indexed voter, uint256 amount);
+
+    constructor() {
+        admin = msg.sender;
+        votingOpen = false;
+        currentTopicId = 0;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can perform this action");
+        _;
+    }
+
+    modifier votingEnabled() {
+        require(votingOpen, "Voting is not open");
+        _;
+    }
+
+    function setAdmin(address _admin) external onlyAdmin {
+        admin = _admin;
+    }
+
+    function openVoting() external onlyAdmin {
+        require(!votingOpen, "Voting is already open");
+        votingOpen = true;
+    }
+
+    function closeVoting() external onlyAdmin {
+        require(votingOpen, "Voting is already closed");
+        votingOpen = false;
+        settleVotes();
+    }
+
+    function createTopic(string memory _name, string memory _description) external onlyAdmin {
+        require(!votingOpen, "Cannot create topic while voting is open");
+
+        currentTopicId++;
+        Topic storage newTopic = topics[currentTopicId];
+        newTopic.name = _name;
+        newTopic.description = _description;
+        newTopic.voteCount = 0;
+
+        emit NewTopic(currentTopicId, _name, _description);
+    }
+
+    function vote(uint256 _topicId) external votingEnabled {
+        require(_topicId > 0 && _topicId <= currentTopicId, "Invalid topic ID");
+        require(!hasVoted[msg.sender], "You have already voted");
+
+        hasVoted[msg.sender] = true;
+        Topic storage topic = topics[_topicId];
+        topic.voteCount++;
+        topic.votes[topic.voteCount] = msg.sender;
+
+        emit VoteCasted(_topicId, msg.sender);
+    }
+
+    function settleVotes() internal {
+        uint256 maxVotes = 0;
+        address winner;
+
+        for (uint256 i = 1; i <= currentTopicId; i++) {
+            Topic storage topic = topics[i];
+            if (topic.voteCount > maxVotes) {
+                maxVotes = topic.voteCount;
+                winner = topic.votes[maxVotes];
+            }
+        }
+
+        if (winner != address(0)) {
+            rewards[winner] += 1; // Reward with 1 token, you can modify this according to your token logic
+            emit RewardsClaimed(winner, 1);
+        }
+    }
+
+    function claimRewards() external {
+        require(rewards[msg.sender] > 0, "No rewards to claim");
+
+        // Transfer rewards to the caller's address
+        // You need to implement the transfer logic based on your token's contract
+
+        rewards[msg.sender] = 0;
+    }
+}
